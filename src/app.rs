@@ -59,13 +59,14 @@ pub async fn run() -> Result<(), AppError> {
             let api = Api::new(&config.token).map_err(AppError::CreateApi)?;
 
             let admin_policy = InMemoryAccessPolicy::from(vec![AccessRule::allow_chat(config.chat_id)]);
-            let subscriber_policy = InMemoryAccessPolicy::from(vec![AccessRule::deny_chat(config.chat_id)]);
+            let subscriber_policy =
+                InMemoryAccessPolicy::from(vec![AccessRule::deny_chat(config.chat_id), AccessRule::allow_all()]);
 
             let mut context = Context::default();
             context.insert(api.clone());
             context.insert(pg_client);
 
-            let chain = Chain::default()
+            let chain = Chain::all()
                 .add(handlers::admin::setup().access(admin_policy))
                 .add(handlers::subscriber::setup().access(subscriber_policy));
 
