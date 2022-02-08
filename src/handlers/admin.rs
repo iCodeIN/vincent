@@ -4,7 +4,7 @@ use carapax::{
 };
 
 pub fn setup() -> Chain {
-    Chain::default()
+    Chain::once()
         .add(handle_users.command("/users"))
         .add(handle_ban.command("/ban"))
         .add(handle_unban.command("/unban"))
