@@ -9,6 +9,7 @@ description = "A feedback bot for Telegram"
 barrel = { version = "0.7.0", features = ["pg"] }
 carapax = { git = "https://github.com/tg-rs/carapax/", rev = "c00c7d4f1", features = ["access"] }
 clap = { version = "3.0.14", features = ["derive"] }
+chrono = "0.4.19"
 dotenv = "0.15.0"
 env_logger = "0.9.0"
 log = "0.4.14"
@@ -16,4 +17,4 @@ refinery = { version = "0.8.4", features = ["tokio-postgres"] }
 serde = "1.0.136"
 serde_yaml = "0.8.23"
 tokio = { version = "1.16.1", features = ["rt-multi-thread"] }
-tokio-postgres = "0.7.5"
+tokio-postgres = { version = "0.7.5", features = ["with-chrono-0_4"] }
