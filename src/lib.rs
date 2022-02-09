@@ -1,6 +1,6 @@
 mod app;
 mod config;
-mod db;
 mod handlers;
+mod migrations;
 
 pub use self::app::run;

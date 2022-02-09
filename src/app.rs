@@ -1,7 +1,6 @@
 use crate::{
     config::{Config, ConfigError},
-    db::migrations,
-    handlers,
+    handlers, migrations,
 };
 use carapax::{
     access::{AccessExt, AccessRule, InMemoryAccessPolicy},
@@ -50,10 +49,7 @@ pub async fn run() -> Result<(), AppError> {
 
     match args.command {
         Command::Migrate => {
-            migrations::runner()
-                .run_async(&mut pg_client)
-                .await
-                .map_err(AppError::Migrate)?;
+            migrations::run(&mut pg_client).await.map_err(AppError::Migrate)?;
         }
         Command::Start => {
             let api = Api::new(&config.token).map_err(AppError::CreateApi)?;
