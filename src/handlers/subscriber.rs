@@ -3,8 +3,8 @@ use crate::{
     services::{MessageLink, MessageLinkDirection, MessageLinkService, MessageLinkServiceError},
 };
 use carapax::{
-    methods::CopyMessage,
-    types::{ChatId, Command, InlineKeyboardButton, Message},
+    methods::{CopyMessage, SendMessage},
+    types::{ChatId, InlineKeyboardButton, Message, ParseMode},
     Api, Chain, CommandExt, ExecuteError, Ref,
 };
 use std::{error::Error, fmt};
@@ -13,8 +13,13 @@ pub fn setup() -> Chain {
     Chain::once().add(handle_start.command("/start")).add(handle_message)
 }
 
-async fn handle_start(chat_id: ChatId, command: Command) {
-    log::info!("Got /start command from subscriber: {} {:?}", chat_id, command);
+async fn handle_start(api: Ref<Api>, config: Ref<Config>, chat_id: ChatId) -> Result<(), SubscriberError> {
+    if let Some(ref text) = config.greeting {
+        api.execute(SendMessage::new(chat_id, text).parse_mode(ParseMode::Html))
+            .await
+            .map_err(SubscriberError::Greet)?;
+    }
+    Ok(())
 }
 
 async fn handle_message(
@@ -70,6 +75,7 @@ enum SubscriberError {
     CopyMessage(ExecuteError),
     CreateLink(MessageLinkServiceError),
     FindLink(MessageLinkServiceError),
+    Greet(ExecuteError),
 }
 
 impl fmt::Display for SubscriberError {
@@ -79,6 +85,7 @@ impl fmt::Display for SubscriberError {
             CopyMessage(err) => write!(out, "Could not copy message: {}", err),
             CreateLink(err) => err.fmt(out),
             FindLink(err) => err.fmt(out),
+            Greet(err) => write!(out, "Could not send a greeting message: {}", err),
         }
     }
 }
@@ -90,6 +97,7 @@ impl Error for SubscriberError {
             CopyMessage(err) => err,
             CreateLink(err) => err,
             FindLink(err) => err,
+            Greet(err) => err,
         })
     }
 }

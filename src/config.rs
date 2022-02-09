@@ -10,6 +10,7 @@ pub struct Config {
     pub database_url: String,
     pub webhook_address: Option<SocketAddr>,
     pub webhook_path: Option<String>,
+    pub greeting: Option<String>,
 }
 
 impl Config {
