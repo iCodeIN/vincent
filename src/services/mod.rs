@@ -1,3 +1,7 @@
+mod message_link;
 mod user;
 
-pub use self::user::{UserService, UserServiceError};
+pub use self::{
+    message_link::{MessageLink, MessageLinkDirection, MessageLinkService, MessageLinkServiceError},
+    user::{UserService, UserServiceError},
+};

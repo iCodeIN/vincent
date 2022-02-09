@@ -1,7 +1,7 @@
 use crate::{
     config::{Config, ConfigError},
     handlers, migrations,
-    services::UserService,
+    services::{MessageLinkService, UserService},
 };
 use carapax::{
     access::{AccessExt, AccessRule, InMemoryAccessPolicy},
@@ -62,7 +62,9 @@ pub async fn run() -> Result<(), AppError> {
             let pg_client = Arc::new(pg_client);
 
             let mut context = Context::default();
+            context.insert(config.clone());
             context.insert(api.clone());
+            context.insert(MessageLinkService::new(pg_client.clone()));
             context.insert(UserService::new(pg_client.clone()));
 
             let chain = Chain::all()

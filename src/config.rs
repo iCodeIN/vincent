@@ -3,7 +3,7 @@ use serde::Deserialize;
 use serde_yaml::Error as YamlError;
 use std::{error::Error, fmt, fs::read_to_string, io::Error as IoError, net::SocketAddr, path::Path};
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct Config {
     pub token: String,
     pub chat_id: Integer,
