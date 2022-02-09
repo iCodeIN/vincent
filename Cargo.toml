@@ -6,7 +6,8 @@ authors = ["Ross Nomann <rossnomann@protonmail.com>"]
 description = "A feedback bot for Telegram"
 
 [dependencies]
-carapax = { version = "0.11.0", features = ["access"] }
+barrel = { version = "0.7.0", features = ["pg"] }
+carapax = { git = "https://github.com/tg-rs/carapax/", rev = "c00c7d4f1", features = ["access"] }
 clap = { version = "3.0.14", features = ["derive"] }
 dotenv = "0.15.0"
 env_logger = "0.9.0"
