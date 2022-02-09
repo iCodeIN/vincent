@@ -1,6 +1,7 @@
 use crate::{
     config::{Config, ConfigError},
     handlers, migrations,
+    services::UserService,
 };
 use carapax::{
     access::{AccessExt, AccessRule, InMemoryAccessPolicy},
@@ -11,7 +12,7 @@ use carapax::{
 };
 use clap::{Parser, Subcommand};
 use refinery::Error as MigrationError;
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, sync::Arc};
 use tokio::spawn;
 use tokio_postgres::{connect as pg_connect, Error as PgError, NoTls as PgNoTls};
 
@@ -58,11 +59,14 @@ pub async fn run() -> Result<(), AppError> {
             let subscriber_policy =
                 InMemoryAccessPolicy::from(vec![AccessRule::deny_chat(config.chat_id), AccessRule::allow_all()]);
 
+            let pg_client = Arc::new(pg_client);
+
             let mut context = Context::default();
             context.insert(api.clone());
-            context.insert(pg_client);
+            context.insert(UserService::new(pg_client.clone()));
 
             let chain = Chain::all()
+                .add(handlers::middleware::setup())
                 .add(handlers::admin::setup().access(admin_policy))
                 .add(handlers::subscriber::setup().access(subscriber_policy));
 
