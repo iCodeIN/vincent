@@ -7,7 +7,7 @@ description = "A feedback bot for Telegram"
 
 [dependencies]
 barrel = { version = "0.7.0", features = ["pg"] }
-carapax = { git = "https://github.com/tg-rs/carapax/", rev = "c00c7d4f1", features = ["access"] }
+carapax = { version = "0.12.0", features = ["access"] }
 clap = { version = "3.0.14", features = ["derive"] }
 chrono = "0.4.19"
 dotenv = "0.15.0"
