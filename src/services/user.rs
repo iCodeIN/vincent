@@ -57,6 +57,15 @@ impl UserService {
         self.set_block(user_id, false).await
     }
 
+    pub async fn is_blocked(&self, user_id: Integer) -> Result<bool, UserServiceError> {
+        let row = self
+            .client
+            .query_opt("SELECT is_blocked FROM users WHERE id = $1", &[&user_id])
+            .await
+            .map_err(|source| UserServiceError::CheckIsBlocked { source, user_id })?;
+        Ok(row.map(|row| row.get(0)).unwrap_or(false))
+    }
+
     async fn count(&self, block_filter: UserBlockFilter) -> Result<i64, UserServiceError> {
         let row = self
             .client
@@ -262,6 +271,10 @@ pub enum UserServiceError {
         source: ClientError,
         user_id: Integer,
     },
+    CheckIsBlocked {
+        source: ClientError,
+        user_id: Integer,
+    },
     Count {
         source: ClientError,
     },
@@ -295,6 +308,13 @@ impl fmt::Display for UserServiceError {
                     user_id, source
                 )
             }
+            CheckIsBlocked { source, user_id } => {
+                write!(
+                    out,
+                    "Could not check whether user with id {} blocked: {}",
+                    user_id, source
+                )
+            }
             Count { source } => write!(out, "Could not count users: {}", source),
             CreateUser { source, user } => {
                 write!(out, "Could not create a user: {} (user={:?})", source, user)
@@ -321,6 +341,7 @@ impl Error for UserServiceError {
         use self::UserServiceError::*;
         Some(match self {
             CheckExists { source, .. } => source,
+            CheckIsBlocked { source, .. } => source,
             Count { source, .. } => source,
             CreateUser { source, .. } => source,
             GetList { source, .. } => source,

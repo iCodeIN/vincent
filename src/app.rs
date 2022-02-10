@@ -1,4 +1,5 @@
 use crate::{
+    access::SubscriberAccessPolicy,
     config::{Config, ConfigError},
     handlers, migrations,
     services::{MessageLinkService, UserService},
@@ -55,17 +56,17 @@ pub async fn run() -> Result<(), AppError> {
         Command::Start => {
             let api = Api::new(&config.token).map_err(AppError::CreateApi)?;
 
-            let admin_policy = InMemoryAccessPolicy::from(vec![AccessRule::allow_chat(config.chat_id)]);
-            let subscriber_policy =
-                InMemoryAccessPolicy::from(vec![AccessRule::deny_chat(config.chat_id), AccessRule::allow_all()]);
-
             let pg_client = Arc::new(pg_client);
+            let user_service = UserService::new(pg_client.clone());
+
+            let admin_policy = InMemoryAccessPolicy::from(vec![AccessRule::allow_chat(config.chat_id)]);
+            let subscriber_policy = SubscriberAccessPolicy::new(user_service.clone(), config.chat_id);
 
             let mut context = Context::default();
             context.insert(config.clone());
             context.insert(api.clone());
             context.insert(MessageLinkService::new(pg_client.clone()));
-            context.insert(UserService::new(pg_client.clone()));
+            context.insert(user_service);
 
             let chain = Chain::all()
                 .add(handlers::middleware::setup())
