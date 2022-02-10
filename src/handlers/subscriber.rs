@@ -7,6 +7,7 @@ use carapax::{
     types::{ChatId, InlineKeyboardButton, Message, ParseMode},
     Api, Chain, CommandExt, ExecuteError, Ref,
 };
+use futures_util::future::OptionFuture;
 use std::{error::Error, fmt};
 
 pub fn setup() -> Chain {
@@ -41,15 +42,16 @@ async fn handle_message(
         };
         method = method.reply_markup(vec![vec![InlineKeyboardButton::with_url(name, url)]])
     }
-    if let Some(reply_to) = subscriber_message.reply_to {
-        if let Some(link) = message_link_service
-            .find(reply_to.get_chat_id(), reply_to.id, MessageLinkDirection::Subscriber)
-            .await
-            .map_err(SubscriberError::FindLink)?
-            .filter(|link| link.admin_chat_id() == admin_chat_id)
-        {
-            method = method.reply_to_message_id(link.admin_message_id());
-        }
+    if let Some(link) = OptionFuture::from(subscriber_message.reply_to.map(|reply_to| {
+        message_link_service.find(reply_to.get_chat_id(), reply_to.id, MessageLinkDirection::Subscriber)
+    }))
+    .await
+    .transpose()
+    .map_err(SubscriberError::FindLink)?
+    .flatten()
+    .filter(|link| link.admin_chat_id() == admin_chat_id)
+    {
+        method = method.reply_to_message_id(link.admin_message_id());
     }
 
     let admin_message_id = api
