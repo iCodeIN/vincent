@@ -1,15 +1,15 @@
 use carapax::{Chain, CommandExt};
 
-mod ban;
+mod block;
 mod message;
-mod unban;
+mod unblock;
 mod users;
 
 pub fn setup() -> Chain {
     Chain::once()
         .add(users::handle_list.command("/users"))
         .add(users::handle_page_changed)
-        .add(ban::handle.command("/ban"))
-        .add(unban::handle.command("/unban"))
+        .add(block::handle.command("/block"))
+        .add(unblock::handle.command("/unblock"))
         .add(message::handle)
 }
