@@ -17,11 +17,12 @@ impl MessageLinkService {
             .execute(
                 r#"
                 INSERT INTO message_links
-                    (subscriber_chat_id, subscriber_message_id, admin_chat_id, admin_message_id)
+                    (subscriber_user_id, subscriber_chat_id, subscriber_message_id, admin_chat_id, admin_message_id)
                 VALUES
-                    ($1, $2, $3, $4)
+                    ($1, $2, $3, $4, $5)
                 "#,
                 &[
+                    &link.subscriber_user_id(),
                     &link.subscriber_chat_id(),
                     &link.subscriber_message_id(),
                     &link.admin_chat_id(),
@@ -65,6 +66,7 @@ impl MessageLinkService {
 
 #[derive(Debug)]
 pub struct MessageLink {
+    subscriber_user_id: Integer,
     subscriber_chat_id: Integer,
     subscriber_message_id: Integer,
     admin_chat_id: Integer,
@@ -73,17 +75,23 @@ pub struct MessageLink {
 
 impl MessageLink {
     pub fn new(
+        subscriber_user_id: Integer,
         subscriber_chat_id: Integer,
         subscriber_message_id: Integer,
         admin_chat_id: Integer,
         admin_message_id: Integer,
     ) -> Self {
         Self {
+            subscriber_user_id,
             subscriber_chat_id,
             subscriber_message_id,
             admin_chat_id,
             admin_message_id,
         }
+    }
+
+    pub fn subscriber_user_id(&self) -> Integer {
+        self.subscriber_user_id
     }
 
     pub fn subscriber_chat_id(&self) -> Integer {
@@ -112,6 +120,7 @@ impl From<Row> for MessageLink {
             .map(|(idx, column)| (column.name(), idx))
             .collect();
         MessageLink::new(
+            row.get(indexes["subscriber_user_id"]),
             row.get(indexes["subscriber_chat_id"]),
             row.get(indexes["subscriber_message_id"]),
             row.get(indexes["admin_chat_id"]),

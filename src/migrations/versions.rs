@@ -58,10 +58,12 @@ fn create_message_links() -> Migration {
     let mut migration = Migration::new();
     migration.create_table("message_links", |table| {
         table.add_column("id", types::primary());
+        table.add_column("subscriber_user_id", types::bigint());
         table.add_column("subscriber_chat_id", types::bigint());
         table.add_column("subscriber_message_id", types::bigint());
         table.add_column("admin_chat_id", types::bigint());
         table.add_column("admin_message_id", types::bigint());
+        table.add_foreign_key(&["subscriber_user_id"], "users", &["id"]);
         table.add_index(
             "message_links_subscriber_idx",
             types::index(&["subscriber_chat_id", "subscriber_message_id"]),

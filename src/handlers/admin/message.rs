@@ -13,6 +13,7 @@ pub async fn handle(
             .await
             .map_err(MessageError::FindLink)?;
         if let Some(link) = link {
+            let subscriber_user_id = link.subscriber_user_id();
             let subscriber_chat_id = link.subscriber_chat_id();
             let admin_chat_id = link.admin_chat_id();
             let subscriber_message_id = api
@@ -25,6 +26,7 @@ pub async fn handle(
                 .message_id;
             message_link_service
                 .create(MessageLink::new(
+                    subscriber_user_id,
                     subscriber_chat_id,
                     subscriber_message_id,
                     admin_chat_id,

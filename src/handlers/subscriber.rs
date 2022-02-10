@@ -29,6 +29,7 @@ async fn handle_message(
     subscriber_message: Message,
 ) -> Result<(), SubscriberError> {
     let admin_chat_id = config.chat_id;
+    let subscriber_user_id = subscriber_message.get_user_id().ok_or(SubscriberError::NoUser)?;
     let subscriber_chat_id = subscriber_message.get_chat_id();
 
     let mut method = CopyMessage::new(admin_chat_id, subscriber_chat_id, subscriber_message.id);
@@ -59,6 +60,7 @@ async fn handle_message(
 
     message_link_service
         .create(MessageLink::new(
+            subscriber_user_id,
             subscriber_chat_id,
             subscriber_message.id,
             admin_chat_id,
@@ -76,6 +78,7 @@ enum SubscriberError {
     CreateLink(MessageLinkServiceError),
     FindLink(MessageLinkServiceError),
     Greet(ExecuteError),
+    NoUser,
 }
 
 impl fmt::Display for SubscriberError {
@@ -86,6 +89,7 @@ impl fmt::Display for SubscriberError {
             CreateLink(err) => err.fmt(out),
             FindLink(err) => err.fmt(out),
             Greet(err) => write!(out, "Could not send a greeting message: {}", err),
+            NoUser => write!(out, "Incoming message has no user"),
         }
     }
 }
@@ -98,6 +102,7 @@ impl Error for SubscriberError {
             CreateLink(err) => err,
             FindLink(err) => err,
             Greet(err) => err,
+            NoUser => return None,
         })
     }
 }
