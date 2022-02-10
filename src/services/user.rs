@@ -1,5 +1,6 @@
 use carapax::types::{Integer, User};
 use chrono::{NaiveDateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, error::Error, fmt, sync::Arc};
 use tokio_postgres::{Client, Error as ClientError, Row};
 
@@ -15,13 +16,20 @@ impl UserService {
         Self { client }
     }
 
-    pub async fn get_list(&self, page_number: i64) -> Result<UserInfoList, UserServiceError> {
-        let total_items = self.count().await?;
+    pub async fn get_list(
+        &self,
+        page_number: i64,
+        block_filter: UserBlockFilter,
+    ) -> Result<UserInfoList, UserServiceError> {
+        let total_items = self.count(block_filter).await?;
         let offset = (page_number * ITEMS_PER_PAGE - ITEMS_PER_PAGE).abs();
         let items = self
             .client
             .query(
-                "SELECT * FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+                &format!(
+                    "SELECT * FROM users {} ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+                    block_filter.to_sql()
+                ),
                 &[&ITEMS_PER_PAGE, &offset],
             )
             .await
@@ -29,7 +37,7 @@ impl UserService {
             .into_iter()
             .map(UserInfo::from)
             .collect();
-        Ok(UserInfoList::new(items, page_number, total_items))
+        Ok(UserInfoList::new(items, page_number, total_items, block_filter))
     }
 
     pub async fn save(&self, user: User) -> Result<(), UserServiceError> {
@@ -41,10 +49,10 @@ impl UserService {
         Ok(())
     }
 
-    async fn count(&self) -> Result<i64, UserServiceError> {
+    async fn count(&self, block_filter: UserBlockFilter) -> Result<i64, UserServiceError> {
         let row = self
             .client
-            .query_one("SELECT COUNT(*) FROM users", &[])
+            .query_one(&format!("SELECT COUNT(*) FROM users {}", block_filter.to_sql()), &[])
             .await
             .map_err(|source| UserServiceError::Count { source })?;
         Ok(row.get(0))
@@ -100,14 +108,16 @@ pub struct UserInfoList {
     items: Vec<UserInfo>,
     page_number: i64,
     total_items: i64,
+    block_filter: UserBlockFilter,
 }
 
 impl UserInfoList {
-    fn new(items: Vec<UserInfo>, page_number: i64, total_items: i64) -> Self {
+    fn new(items: Vec<UserInfo>, page_number: i64, total_items: i64, block_filter: UserBlockFilter) -> Self {
         Self {
             items,
             page_number,
             total_items,
+            block_filter,
         }
     }
 
@@ -121,6 +131,10 @@ impl UserInfoList {
 
     pub fn total_items(&self) -> i64 {
         self.total_items
+    }
+
+    pub fn block_filter(&self) -> UserBlockFilter {
+        self.block_filter
     }
 }
 
@@ -181,6 +195,48 @@ impl From<Row> for UserInfo {
         }
     }
 }
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub enum UserBlockFilter {
+    All,
+    False,
+    True,
+}
+
+impl UserBlockFilter {
+    fn to_sql(&self) -> &'static str {
+        use self::UserBlockFilter::*;
+        match self {
+            All => "",
+            False => "WHERE is_blocked IS FALSE",
+            True => "WHERE is_blocked IS TRUE",
+        }
+    }
+}
+
+impl TryFrom<Option<&String>> for UserBlockFilter {
+    type Error = UserBlockFilterError;
+
+    fn try_from(value: Option<&String>) -> Result<Self, Self::Error> {
+        Ok(match value.map(String::as_str) {
+            Some("blocked") => Self::True,
+            Some("!blocked") => Self::False,
+            Some(value) => return Err(UserBlockFilterError(value.to_string())),
+            None => Self::All,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct UserBlockFilterError(String);
+
+impl fmt::Display for UserBlockFilterError {
+    fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
+        write!(out, "unknown filter value: {}", self.0)
+    }
+}
+
+impl Error for UserBlockFilterError {}
 
 #[derive(Debug)]
 pub enum UserServiceError {

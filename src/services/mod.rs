@@ -3,5 +3,5 @@ mod user;
 
 pub use self::{
     message_link::{MessageLink, MessageLinkDirection, MessageLinkService, MessageLinkServiceError},
-    user::{UserInfoList, UserService, UserServiceError},
+    user::{UserBlockFilter, UserBlockFilterError, UserInfoList, UserService, UserServiceError},
 };

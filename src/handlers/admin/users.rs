@@ -1,15 +1,32 @@
-use crate::services::{UserInfoList, UserService, UserServiceError};
+use crate::services::{UserBlockFilter, UserInfoList, UserService, UserServiceError};
 use carapax::{
     methods::{AnswerCallbackQuery, EditMessageText, SendMessage},
-    types::{CallbackQuery, CallbackQueryError, ChatId, InlineKeyboardButton, InlineKeyboardError, Integer, ParseMode},
-    Api, ExecuteError, Ref, TryFromInput,
+    types::{
+        CallbackQuery, CallbackQueryError, ChatId, Command, InlineKeyboardButton, InlineKeyboardError, Integer,
+        ParseMode,
+    },
+    Api, ExecuteError, HandlerInput, Ref, TryFromInput,
 };
 use futures_util::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use std::{error::Error, fmt};
 
-pub async fn handle_list(api: Ref<Api>, user_service: Ref<UserService>, chat_id: ChatId) -> Result<(), UsersError> {
-    let users = user_service.get_list(1).await.map_err(UsersError::Get)?;
+pub async fn handle_list(
+    api: Ref<Api>,
+    user_service: Ref<UserService>,
+    chat_id: ChatId,
+    command: Command,
+) -> Result<(), UsersError> {
+    let block_filter: UserBlockFilter = match command.get_args().first().try_into() {
+        Ok(value) => value,
+        Err(err) => {
+            api.execute(SendMessage::new(chat_id, err.to_string()))
+                .await
+                .map_err(UsersError::ExecuteSend)?;
+            return Ok(());
+        }
+    };
+    let users = user_service.get_list(1, block_filter).await.map_err(UsersError::Get)?;
     let keyboard = build_keyboard(&users).map_err(UsersError::BuildKeyboard)?;
     api.execute(
         SendMessage::new(chat_id, users.to_string())
@@ -26,7 +43,10 @@ pub async fn handle_page_changed(
     user_service: Ref<UserService>,
     query: PageQuery,
 ) -> Result<(), UsersError> {
-    let users = user_service.get_list(query.number).await.map_err(UsersError::Get)?;
+    let users = user_service
+        .get_list(query.number, query.block_filter)
+        .await
+        .map_err(UsersError::Get)?;
     let keyboard = build_keyboard(&users).map_err(UsersError::BuildKeyboard)?;
     api.execute(
         EditMessageText::new(query.chat_id, query.message_id, users.to_string())
@@ -46,10 +66,14 @@ fn build_keyboard(list: &UserInfoList) -> Result<Vec<Vec<InlineKeyboardButton>>,
     let current_page = list.page_number();
     let total_pages = list.total_pages();
     let total_items = list.total_items();
+    let block_filter = list.block_filter();
     if current_page != 1 {
         row.push(InlineKeyboardButton::with_callback_data_struct(
             "<<",
-            &Page { number: 1 },
+            &Page {
+                number: 1,
+                block_filter,
+            },
         )?)
     }
     if current_page > 2 {
@@ -57,25 +81,33 @@ fn build_keyboard(list: &UserInfoList) -> Result<Vec<Vec<InlineKeyboardButton>>,
             "<",
             &Page {
                 number: current_page - 1,
+                block_filter,
             },
         )?);
     }
     row.push(InlineKeyboardButton::with_callback_data_struct(
         format!("{}/{} ({})", current_page, total_pages, total_items),
-        &Page { number: current_page },
+        &Page {
+            number: current_page,
+            block_filter,
+        },
     )?);
     if current_page < total_pages - 1 {
         row.push(InlineKeyboardButton::with_callback_data_struct(
             ">",
             &Page {
                 number: current_page + 1,
+                block_filter,
             },
         )?);
     }
     if current_page < total_pages {
         row.push(InlineKeyboardButton::with_callback_data_struct(
             ">>",
-            &Page { number: total_pages },
+            &Page {
+                number: total_pages,
+                block_filter,
+            },
         )?)
     }
     Ok(vec![row])
@@ -84,6 +116,7 @@ fn build_keyboard(list: &UserInfoList) -> Result<Vec<Vec<InlineKeyboardButton>>,
 #[derive(Serialize, Deserialize)]
 struct Page {
     number: i64,
+    block_filter: UserBlockFilter,
 }
 
 pub struct PageQuery {
@@ -91,23 +124,24 @@ pub struct PageQuery {
     chat_id: Integer,
     message_id: Integer,
     number: i64,
+    block_filter: UserBlockFilter,
 }
 
 impl TryFrom<CallbackQuery> for PageQuery {
     type Error = PageQueryError;
 
     fn try_from(query: CallbackQuery) -> Result<Self, Self::Error> {
-        let number = query
+        let Page { number, block_filter } = query
             .parse_data()
             .map_err(PageQueryError::ParseData)
-            .and_then(|page: Option<Page>| page.ok_or(PageQueryError::NoData))?
-            .number;
+            .and_then(|page: Option<Page>| page.ok_or(PageQueryError::NoData))?;
         let message = query.message.ok_or(PageQueryError::NoMessage)?;
         Ok(Self {
             id: query.id,
             chat_id: message.get_chat_id(),
             message_id: message.id,
             number,
+            block_filter,
         })
     }
 }
@@ -146,7 +180,7 @@ impl TryFromInput for PageQuery {
 
     type Future = BoxFuture<'static, Result<Option<Self>, Self::Error>>;
 
-    fn try_from_input(input: carapax::HandlerInput) -> Self::Future {
+    fn try_from_input(input: HandlerInput) -> Self::Future {
         Box::pin(async move {
             CallbackQuery::try_from_input(input)
                 .await
@@ -172,7 +206,7 @@ impl fmt::Display for UsersError {
         match self {
             BuildKeyboard(err) => write!(out, "could not build inline keyboard: {}", err),
             ExecuteAnswer(err) => write!(out, "could not answer to a callback query: {}", err),
-            ExecuteSend(err) => write!(out, "could not send users list: {}", err),
+            ExecuteSend(err) => err.fmt(out),
             Get(err) => err.fmt(out),
         }
     }
