@@ -50,8 +50,8 @@ pub async fn handle(
 #[derive(Debug)]
 pub enum BlockError {
     GetLink(MessageLinkServiceError),
-    SetBlock(UserServiceError),
     SendMessage(ExecuteError),
+    SetBlock(UserServiceError),
 }
 
 impl fmt::Display for BlockError {
@@ -59,8 +59,8 @@ impl fmt::Display for BlockError {
         use self::BlockError::*;
         match self {
             GetLink(err) => err.fmt(out),
+            SendMessage(err) => err.fmt(out),
             SetBlock(err) => err.fmt(out),
-            SendMessage(err) => write!(out, "could not send a message: {}", err),
         }
     }
 }
@@ -70,8 +70,8 @@ impl Error for BlockError {
         use self::BlockError::*;
         Some(match self {
             GetLink(err) => err,
-            SetBlock(err) => err,
             SendMessage(err) => err,
+            SetBlock(err) => err,
         })
     }
 }

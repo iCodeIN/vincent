@@ -85,11 +85,11 @@ impl fmt::Display for SubscriberError {
     fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
         use self::SubscriberError::*;
         match self {
-            CopyMessage(err) => write!(out, "Could not copy message: {}", err),
+            CopyMessage(err) => err.fmt(out),
             CreateLink(err) => err.fmt(out),
             FindLink(err) => err.fmt(out),
-            Greet(err) => write!(out, "Could not send a greeting message: {}", err),
-            NoUser => write!(out, "Incoming message has no user"),
+            Greet(err) => err.fmt(out),
+            NoUser => write!(out, "incoming message has no user"),
         }
     }
 }

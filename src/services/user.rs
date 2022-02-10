@@ -304,33 +304,31 @@ impl fmt::Display for UserServiceError {
             CheckExists { source, user_id } => {
                 write!(
                     out,
-                    "Could not check whether user with id {} exists: {}",
+                    "failed to check whether user with id {} exists: {}",
                     user_id, source
                 )
             }
             CheckIsBlocked { source, user_id } => {
                 write!(
                     out,
-                    "Could not check whether user with id {} blocked: {}",
+                    "failed to check whether user with id {} blocked: {}",
                     user_id, source
                 )
             }
-            Count { source } => write!(out, "Could not count users: {}", source),
+            Count { source } => write!(out, "count users error: {}", source),
             CreateUser { source, user } => {
-                write!(out, "Could not create a user: {} (user={:?})", source, user)
+                write!(out, "create user error: {} (user={:?})", source, user)
             }
-            GetList { source, page_number } => write!(
-                out,
-                "Could not get a list of users: {} (page_number={})",
-                source, page_number
-            ),
-            SetBlock { source, user_id, value } => write!(
-                out,
-                "Could not set block to {} for user with id {}: {}",
-                value, user_id, source
-            ),
+            GetList { source, page_number } => write!(out, "get users: {} (page_number={})", source, page_number),
+            SetBlock { source, user_id, value } => {
+                write!(
+                    out,
+                    "failed to set block to {} for user with id {}: {}",
+                    value, user_id, source
+                )
+            }
             UpdateUser { source, user } => {
-                write!(out, "Could not create a user: {} (user={:?})", source, user)
+                write!(out, "update user error: {} (user={:?})", source, user)
             }
         }
     }

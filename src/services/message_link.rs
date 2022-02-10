@@ -163,7 +163,7 @@ impl fmt::Display for MessageLinkServiceError {
     fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
         use self::MessageLinkServiceError::*;
         match self {
-            Create { source, link } => write!(out, "Could not create message link: {} ({:?})", source, link),
+            Create { source, link } => write!(out, "could not create message link: {} ({:?})", source, link),
             Find {
                 source,
                 chat_id,
@@ -171,7 +171,7 @@ impl fmt::Display for MessageLinkServiceError {
                 direction,
             } => write!(
                 out,
-                "Could not find message link for {}: {} (chat_id={}, message_id={})",
+                "could not find message link for {}: {} (chat_id={}, message_id={})",
                 direction, source, chat_id, message_id
             ),
         }

@@ -22,11 +22,14 @@ pub async fn handle_list(
         Err(err) => {
             api.execute(SendMessage::new(chat_id, err.to_string()))
                 .await
-                .map_err(UsersError::ExecuteSend)?;
+                .map_err(UsersError::SendMessage)?;
             return Ok(());
         }
     };
-    let users = user_service.get_list(1, block_filter).await.map_err(UsersError::Get)?;
+    let users = user_service
+        .get_list(1, block_filter)
+        .await
+        .map_err(UsersError::GetList)?;
     let keyboard = build_keyboard(&users).map_err(UsersError::BuildKeyboard)?;
     api.execute(
         SendMessage::new(chat_id, users.to_string())
@@ -34,7 +37,7 @@ pub async fn handle_list(
             .reply_markup(keyboard),
     )
     .await
-    .map_err(UsersError::ExecuteSend)?;
+    .map_err(UsersError::SendMessage)?;
     Ok(())
 }
 
@@ -46,7 +49,7 @@ pub async fn handle_page_changed(
     let users = user_service
         .get_list(query.number, query.block_filter)
         .await
-        .map_err(UsersError::Get)?;
+        .map_err(UsersError::GetList)?;
     let keyboard = build_keyboard(&users).map_err(UsersError::BuildKeyboard)?;
     api.execute(
         EditMessageText::new(query.chat_id, query.message_id, users.to_string())
@@ -54,10 +57,10 @@ pub async fn handle_page_changed(
             .reply_markup(keyboard),
     )
     .await
-    .map_err(UsersError::ExecuteSend)?;
+    .map_err(UsersError::SendMessage)?;
     api.execute(AnswerCallbackQuery::new(query.id))
         .await
-        .map_err(UsersError::ExecuteAnswer)?;
+        .map_err(UsersError::AnswerCallbackQuery)?;
     Ok(())
 }
 
@@ -194,20 +197,20 @@ impl TryFromInput for PageQuery {
 
 #[derive(Debug)]
 pub enum UsersError {
+    AnswerCallbackQuery(ExecuteError),
     BuildKeyboard(InlineKeyboardError),
-    ExecuteAnswer(ExecuteError),
-    ExecuteSend(ExecuteError),
-    Get(UserServiceError),
+    GetList(UserServiceError),
+    SendMessage(ExecuteError),
 }
 
 impl fmt::Display for UsersError {
     fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
         use self::UsersError::*;
         match self {
+            AnswerCallbackQuery(err) => err.fmt(out),
             BuildKeyboard(err) => write!(out, "could not build inline keyboard: {}", err),
-            ExecuteAnswer(err) => write!(out, "could not answer to a callback query: {}", err),
-            ExecuteSend(err) => err.fmt(out),
-            Get(err) => err.fmt(out),
+            GetList(err) => err.fmt(out),
+            SendMessage(err) => err.fmt(out),
         }
     }
 }
@@ -216,10 +219,10 @@ impl Error for UsersError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         use self::UsersError::*;
         Some(match self {
+            AnswerCallbackQuery(err) => err,
             BuildKeyboard(err) => err,
-            ExecuteAnswer(err) => err,
-            ExecuteSend(err) => err,
-            Get(err) => err,
+            GetList(err) => err,
+            SendMessage(err) => err,
         })
     }
 }

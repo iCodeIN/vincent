@@ -44,16 +44,16 @@ pub async fn handle(
 
 #[derive(Debug)]
 pub enum UnblockError {
-    SetBlock(UserServiceError),
     SendMessage(ExecuteError),
+    SetBlock(UserServiceError),
 }
 
 impl fmt::Display for UnblockError {
     fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
         use self::UnblockError::*;
         match self {
+            SendMessage(err) => err.fmt(out),
             SetBlock(err) => err.fmt(out),
-            SendMessage(err) => write!(out, "could not send message: {}", err),
         }
     }
 }
@@ -62,8 +62,8 @@ impl Error for UnblockError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         use self::UnblockError::*;
         Some(match self {
-            SetBlock(err) => err,
             SendMessage(err) => err,
+            SetBlock(err) => err,
         })
     }
 }

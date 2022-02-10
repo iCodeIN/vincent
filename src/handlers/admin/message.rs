@@ -22,7 +22,7 @@ pub async fn handle(
                         .reply_to_message_id(link.subscriber_message_id()),
                 )
                 .await
-                .map_err(MessageError::ExecuteCopy)?
+                .map_err(MessageError::CopyMessage)?
                 .message_id;
             message_link_service
                 .create(MessageLink::new(
@@ -41,8 +41,8 @@ pub async fn handle(
 
 #[derive(Debug)]
 pub enum MessageError {
+    CopyMessage(ExecuteError),
     CreateLink(MessageLinkServiceError),
-    ExecuteCopy(ExecuteError),
     FindLink(MessageLinkServiceError),
 }
 
@@ -51,7 +51,7 @@ impl fmt::Display for MessageError {
         use self::MessageError::*;
         match self {
             CreateLink(err) => err.fmt(out),
-            ExecuteCopy(err) => write!(out, "could not copy message: {}", err),
+            CopyMessage(err) => err.fmt(out),
             FindLink(err) => err.fmt(out),
         }
     }
@@ -62,7 +62,7 @@ impl Error for MessageError {
         use self::MessageError::*;
         Some(match self {
             CreateLink(err) => err,
-            ExecuteCopy(err) => err,
+            CopyMessage(err) => err,
             FindLink(err) => err,
         })
     }
