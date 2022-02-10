@@ -28,7 +28,7 @@ impl UserService {
             .query(
                 &format!(
                     "SELECT * FROM users {} ORDER BY created_at DESC LIMIT $1 OFFSET $2",
-                    block_filter.to_sql()
+                    block_filter.as_sql()
                 ),
                 &[&ITEMS_PER_PAGE, &offset],
             )
@@ -49,10 +49,18 @@ impl UserService {
         Ok(())
     }
 
+    pub async fn block(&self, user_id: Integer) -> Result<bool, UserServiceError> {
+        self.set_block(user_id, true).await
+    }
+
+    pub async fn unblock(&self, user_id: Integer) -> Result<bool, UserServiceError> {
+        self.set_block(user_id, false).await
+    }
+
     async fn count(&self, block_filter: UserBlockFilter) -> Result<i64, UserServiceError> {
         let row = self
             .client
-            .query_one(&format!("SELECT COUNT(*) FROM users {}", block_filter.to_sql()), &[])
+            .query_one(&format!("SELECT COUNT(*) FROM users {}", block_filter.as_sql()), &[])
             .await
             .map_err(|source| UserServiceError::Count { source })?;
         Ok(row.get(0))
@@ -100,6 +108,15 @@ impl UserService {
             .await
             .map_err(|source| UserServiceError::UpdateUser { source, user })?;
         Ok(())
+    }
+
+    async fn set_block(&self, user_id: Integer, value: bool) -> Result<bool, UserServiceError> {
+        let affected_rows = self
+            .client
+            .execute("UPDATE users SET is_blocked = $1 WHERE id = $2", &[&value, &user_id])
+            .await
+            .map_err(|source| UserServiceError::SetBlock { source, user_id, value })?;
+        Ok(affected_rows != 0)
     }
 }
 
@@ -157,6 +174,7 @@ struct UserInfo {
 
 impl fmt::Display for UserInfo {
     fn fmt(&self, out: &mut fmt::Formatter) -> fmt::Result {
+        write!(out, "<code>{}</code> ", self.id)?;
         let mut name = self.first_name.clone();
         if let Some(ref last_name) = self.last_name {
             name = format!("{} {}", name, last_name);
@@ -165,9 +183,9 @@ impl fmt::Display for UserInfo {
         if let Some(ref username) = self.username {
             write!(out, " (@{username})")?;
         }
-        write!(out, " {}", self.created_at.format("%Y-%m-%d %H:%M:%S"))?;
+        write!(out, " {}", self.created_at.format("%d/%m/%y %H:%M:%S"))?;
         if let Some(updated_at) = self.updated_at {
-            write!(out, " {}", updated_at.format("%Y-%m-%d %H:%M:%S"))?;
+            write!(out, " {}", updated_at.format("%d/%m/%y %H:%M:%S"))?;
         }
         if self.is_blocked {
             write!(out, " ❌")?;
@@ -204,7 +222,7 @@ pub enum UserBlockFilter {
 }
 
 impl UserBlockFilter {
-    fn to_sql(&self) -> &'static str {
+    fn as_sql(&self) -> &'static str {
         use self::UserBlockFilter::*;
         match self {
             All => "",
@@ -240,11 +258,30 @@ impl Error for UserBlockFilterError {}
 
 #[derive(Debug)]
 pub enum UserServiceError {
-    CheckExists { source: ClientError, user_id: Integer },
-    Count { source: ClientError },
-    CreateUser { source: ClientError, user: User },
-    GetList { source: ClientError, page_number: i64 },
-    UpdateUser { source: ClientError, user: User },
+    CheckExists {
+        source: ClientError,
+        user_id: Integer,
+    },
+    Count {
+        source: ClientError,
+    },
+    CreateUser {
+        source: ClientError,
+        user: User,
+    },
+    GetList {
+        source: ClientError,
+        page_number: i64,
+    },
+    SetBlock {
+        source: ClientError,
+        user_id: Integer,
+        value: bool,
+    },
+    UpdateUser {
+        source: ClientError,
+        user: User,
+    },
 }
 
 impl fmt::Display for UserServiceError {
@@ -267,6 +304,11 @@ impl fmt::Display for UserServiceError {
                 "Could not get a list of users: {} (page_number={})",
                 source, page_number
             ),
+            SetBlock { source, user_id, value } => write!(
+                out,
+                "Could not set block to {} for user with id {}: {}",
+                value, user_id, source
+            ),
             UpdateUser { source, user } => {
                 write!(out, "Could not create a user: {} (user={:?})", source, user)
             }
@@ -282,6 +324,7 @@ impl Error for UserServiceError {
             Count { source, .. } => source,
             CreateUser { source, .. } => source,
             GetList { source, .. } => source,
+            SetBlock { source, .. } => source,
             UpdateUser { source, .. } => source,
         })
     }
