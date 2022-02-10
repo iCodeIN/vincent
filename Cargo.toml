@@ -17,5 +17,5 @@ log = "0.4.14"
 refinery = { version = "0.8.4", features = ["tokio-postgres"] }
 serde = "1.0.136"
 serde_yaml = "0.8.23"
-tokio = { version = "1.16.1", features = ["rt-multi-thread"] }
+tokio = "1.16.1"
 tokio-postgres = { version = "0.7.5", features = ["with-chrono-0_4"] }
