@@ -15,7 +15,7 @@ use clap::{Parser, Subcommand};
 use refinery::Error as MigrationError;
 use std::{error::Error, fmt, sync::Arc};
 use tokio::spawn;
-use tokio_postgres::{connect as pg_connect, Error as PgError, NoTls as PgNoTls};
+use tokio_postgres::{connect as pg_connect, Client as PgClient, Error as PgError, NoTls as PgNoTls};
 
 #[derive(Parser)]
 #[clap(about, author, version)]
@@ -54,38 +54,44 @@ pub async fn run() -> Result<(), AppError> {
             migrations::run(&mut pg_client).await.map_err(AppError::Migrate)?;
         }
         Command::Start => {
-            let api = Api::new(&config.token).map_err(AppError::CreateApi)?;
+            start(config, pg_client).await?;
+        }
+    }
 
-            let pg_client = Arc::new(pg_client);
-            let user_service = UserService::new(pg_client.clone());
+    Ok(())
+}
 
-            let admin_policy = InMemoryAccessPolicy::from(vec![AccessRule::allow_chat(config.chat_id)]);
-            let subscriber_policy = SubscriberAccessPolicy::new(user_service.clone(), config.chat_id);
+async fn start(config: Config, pg_client: PgClient) -> Result<(), AppError> {
+    let api = Api::new(&config.token).map_err(AppError::CreateApi)?;
 
-            let mut context = Context::default();
-            context.insert(config.clone());
-            context.insert(api.clone());
-            context.insert(MessageLinkService::new(pg_client.clone()));
-            context.insert(user_service);
+    let pg_client = Arc::new(pg_client);
+    let user_service = UserService::new(pg_client.clone());
 
-            let chain = Chain::all()
-                .add(handlers::middleware::setup())
-                .add(handlers::admin::setup().access(admin_policy))
-                .add(handlers::subscriber::setup().access(subscriber_policy));
+    let admin_policy = InMemoryAccessPolicy::from(vec![AccessRule::allow_chat(config.chat_id)]);
+    let subscriber_policy = SubscriberAccessPolicy::new(user_service.clone(), config.chat_id);
 
-            let app = App::new(context, chain);
+    let mut context = Context::default();
+    context.insert(config.clone());
+    context.insert(api.clone());
+    context.insert(MessageLinkService::new(pg_client.clone()));
+    context.insert(user_service);
 
-            match config.webhook_address {
-                Some(address) => {
-                    let path = config.webhook_path.unwrap_or_else(|| String::from("/"));
-                    webhook::run_server(address, path, app)
-                        .await
-                        .map_err(AppError::StartServer)?;
-                }
-                None => {
-                    LongPoll::new(api, app).run().await;
-                }
-            }
+    let chain = Chain::all()
+        .add(handlers::middleware::setup())
+        .add(handlers::admin::setup().access(admin_policy))
+        .add(handlers::subscriber::setup().access(subscriber_policy));
+
+    let app = App::new(context, chain);
+
+    match config.webhook_address {
+        Some(address) => {
+            let path = config.webhook_path.unwrap_or_else(|| String::from("/"));
+            webhook::run_server(address, path, app)
+                .await
+                .map_err(AppError::StartServer)?;
+        }
+        None => {
+            LongPoll::new(api, app).run().await;
         }
     }
 
